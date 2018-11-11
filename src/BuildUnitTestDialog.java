@@ -15,8 +15,7 @@ public class BuildUnitTestDialog extends JDialog {
     private JButton buttonCancel;
     private JTextField BaseProjectPath;
     private JTextField UnitTestPath;
-    private JTabbedPane tabbedPane1;
-    private JPanel testMethodPane;
+    private JPanel methodPanel;
 
     private Project project;
     private PropertiesComponent properties;
@@ -41,8 +40,6 @@ public class BuildUnitTestDialog extends JDialog {
         JLabel textPane = new JLabel();
         textPane.setText("test_DioCoreMiao");
 
-        GridLayoutManager manager = new GridLayoutManager(2, 2, JBUI.emptyInsets(), 0, 0);
-        testMethodPane.setLayout(manager);
 
         GridConstraints grid = new GridConstraints();
         grid.setRow(0);
@@ -57,11 +54,19 @@ public class BuildUnitTestDialog extends JDialog {
         grid2.setAnchor(GridConstraints.ANCHOR_NORTHWEST);
 
         ok.doClick();
+//        methodPanel
 
+        GridConstraints grid3 = new GridConstraints();
+        grid2.setRow(0);
+        grid2.setColumn(2);
+//        grid2.setFill(GridConstraints.FILL_NONE);
+        grid2.setAnchor(GridConstraints.ANCHOR_NORTHWEST);
 
-        testMethodPane.add(ok, grid);
-        testMethodPane.add(textPane, grid2);
-        testMethodPane.revalidate();
+        Spacer spacer = new Spacer();
+        methodPanel.setLayout(new GridLayoutManager(1, 3, new Insets(0, 0, 0, 0), -1, -1));
+        methodPanel.add(ok, grid);
+        methodPanel.add(textPane, grid2);
+
         // 面板设置
         setContentPane(contentPane);
         setModal(true);
@@ -115,16 +120,16 @@ public class BuildUnitTestDialog extends JDialog {
         BuildUnitTestDialog dialog = new BuildUnitTestDialog();
         dialog.pack();
 
-        int width = dialog.getWidth();
-        int height = dialog.getHeight();
+//        int width = dialog.getWidth();
+//        int height = dialog.getHeight();
+//
+//        Toolkit kit = Toolkit.getDefaultToolkit(); //定义工具包
+//
+//        int screenWidth = kit.getScreenSize().width; //获取屏幕的宽
+//
+//        int screenHeight = kit.getScreenSize().height; //获取屏幕的高
 
-        Toolkit kit = Toolkit.getDefaultToolkit(); //定义工具包
-
-        int screenWidth = kit.getScreenSize().width; //获取屏幕的宽
-
-        int screenHeight = kit.getScreenSize().height; //获取屏幕的高
-
-        dialog.setLocation(screenWidth / 2 - width / 2, screenHeight / 2 - height / 2);
+        dialog.setLocationRelativeTo(dialog.getOwner());
         dialog.setVisible(true);
         System.exit(0);
     }
@@ -168,17 +173,14 @@ public class BuildUnitTestDialog extends JDialog {
         UnitTestPath = new JTextField();
         panel3.add(UnitTestPath, new GridConstraints(1, 1, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, GridConstraints.SIZEPOLICY_FIXED, null, new Dimension(150, -1), null, 0, false));
         final JLabel label1 = new JLabel();
-        label1.setText("BaseProjectPath");
-        panel3.add(label1, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        label1.setText("UnitTestPath");
+        panel3.add(label1, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         final JLabel label2 = new JLabel();
-        label2.setText("UnitTestPath");
-        panel3.add(label2, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
-        tabbedPane1 = new JTabbedPane();
-        tabbedPane1.setToolTipText("Miao");
-        contentPane.add(tabbedPane1, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, new Dimension(-1, 300), null, null, 0, false));
-        testMethodPane = new JPanel();
-        testMethodPane.setLayout(new GridLayoutManager(1, 1, new Insets(0, 0, 0, 0), -1, -1));
-        tabbedPane1.addTab("test_method", testMethodPane);
+        label2.setText("BaseProjectPath");
+        panel3.add(label2, new GridConstraints(0, 0, 1, 1, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+        methodPanel = new JPanel();
+        methodPanel.setLayout(new GridLayoutManager(1, 1, new Insets(0, 0, 0, 0), -1, -1));
+        contentPane.add(methodPanel, new GridConstraints(1, 0, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
     }
 
     /**

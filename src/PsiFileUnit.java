@@ -50,6 +50,15 @@ public class PsiFileUnit
         return PsiTreeUtil.getParentOfType(element, aClass);
     }
 
+
+    /**
+     * 找到子元素 的
+     * @param editor 编辑器
+     * @param psiFile psi文件
+     * @param aClass 查找类
+     * @param <T> ~ 元素类型
+     * @return 插入符 选在块父级元素
+     */
     public static <T extends PsiElement> T findCaretTopParentElement(Editor editor, PsiFile psiFile, Class<T> aClass) {
 
         T lastParentElement;
