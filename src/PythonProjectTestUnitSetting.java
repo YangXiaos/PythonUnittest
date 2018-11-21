@@ -1,5 +1,6 @@
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -11,21 +12,27 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.python.psi.PyClass;
+import com.jetbrains.python.psi.PyFile;
 import com.jetbrains.python.psi.PyFunction;
-import com.jetbrains.python.psi.impl.PyFileImpl;
+import com.jetbrains.python.psi.impl.PyFunctionBuilder;
 import org.apache.log4j.Logger;
 
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PythonProjectTestUnitSetting extends AnAction {
 
     private static final Logger LOG = Logger.getLogger(PythonProjectTestUnitSetting.class);
     private static final String TEST_FUNCTION_PREFIX = "test_";
+    private static final Pattern TEST_FILE_PREFIX = Pattern.compile("test_(.*)\\.py");
+
 
     @Override
     public void actionPerformed(AnActionEvent e) {
@@ -40,8 +47,7 @@ public class PythonProjectTestUnitSetting extends AnAction {
             return;
         }
 
-        VirtualFile fileByPath = LocalFileSystem.getInstance().findFileByPath("/home/mryang/Project/dio_core/DioCore/Units");
-
+        PsiDirectory baseDir = PsiManager.getInstance(project).findDirectory(project.getBaseDir());
 
         // 获取插入符的类，函数
         PyClass pyClass = PsiFileUnit.findCaretParentElement(editor, psiFile, PyClass.class);
@@ -75,6 +81,8 @@ public class PythonProjectTestUnitSetting extends AnAction {
         String sourceDirParentPath = baseSourcePath + relativeDirPath;
         String testUnitDirParentPath = testUnitPath + relativeDirPath;
 
+        findFileOfPath(testUnitPath);
+
         // 测试文件 切回源文件
         if (filePath.startsWith(testUnitPath) && fileName.startsWith(TEST_FUNCTION_PREFIX)) {
 
@@ -85,7 +93,7 @@ public class PythonProjectTestUnitSetting extends AnAction {
                 return;
             }
 
-            PsiDirectory dir = (PsiDirectory) directory;
+            PsiDirectory dir = PsiManager.getInstance(project).findDirectory(directory);
             List<PsiElement> elementList = new LinkedList<>();
             elementList.addAll(getClassChildrenOfName(dir, elementName));
             elementList.addAll(getFunctionChildrenOfName(dir, elementName));
@@ -108,19 +116,50 @@ public class PythonProjectTestUnitSetting extends AnAction {
                     String.format(testFunctionName, pyClass.getName()) : // 为Null 使用 类名
                     String.format(testFunctionName, pyFunction.getName());
 
-            VirtualFile file = findFileOfPath(testUnitDirParentPath + testFileName);
+            VirtualFile file = findFileOfPath(testUnitDirParentPath + "/" + testFileName);
 
-            // 如果获取不到测试文件，则创建
+            // 如果获取不到测试文件，则创建切换
             if (file == null) {
+                // 创建测试文件
+                String testRelativeDirFilePath = (testUnitPath + relativeDirFilePath).replace(project.getBasePath(), "");
+                PsiDirectory relativeDir = PyPackageUnit.createPyPackageOfPath(getRelativeDirPath(testRelativeDirFilePath), baseDir);
+
+                PsiFile testPsiFile = relativeDir.findFile(testFileName);
+                PyFile testFile;
+                if (testPsiFile == null) {
+                    testFile = (PyFile) relativeDir.createFile(testFileName);
+                } else {
+                    testFile = (PyFile) testPsiFile;
+                }
+                // 创建测试函数
+                PyFunction testFunction = new PyFunctionBuilder(testFunctionName, testFile).buildFunction();
+                Runnable runnable = () -> {
+                    //写入
+                    testFile.add(testFunction);
+                };
+                WriteCommandAction.runWriteCommandAction(project, runnable);
+                toggleCurrentEditor(project, testFile).getCaretModel().moveToOffset(testFunction.getTextOffset());
+                return;
             }
-
+            PsiFile testFile = PsiManager.getInstance(project).findFile(file);
             // 切换至测试文件
+            Editor currentEditor = toggleCurrentEditor(project, testFile);
 
+            // 确认是否有创建测试函数
+            List<PsiElement> children = getFunctionChildrenOfName(testFile, testFunctionName);
+            if (children.size() != 0) {
+                currentEditor.getCaretModel().moveToOffset(children.get(0).getTextOffset());
+            } else {
 
+                PyFunction testFunction = new PyFunctionBuilder(testFunctionName, testFile).buildFunction();
+                Runnable runnable = () -> {
+                    //写入
+                    testFile.add(testFunction);
+                };
+                WriteCommandAction.runWriteCommandAction(project, runnable);
+                currentEditor.getCaretModel().moveToOffset(testFunction.getTextOffset());
+            }
         }
-
-        PyClass[] classes = ((PyFileImpl) psiFile).findChildrenByClass(PyClass.class);
-
     }
 
 
@@ -141,7 +180,7 @@ public class PythonProjectTestUnitSetting extends AnAction {
      * @param psiFile 文件
      * @return 切换的 editor
      */
-    private Editor toggleSourceFile(Project project, PsiFile psiFile) {
+    private Editor toggleCurrentEditor(Project project, PsiFile psiFile) {
         OpenFileDescriptor openFileDescriptor = new OpenFileDescriptor(project, psiFile.getVirtualFile());
         return FileEditorManager.getInstance(project).openTextEditor(openFileDescriptor, true);
     }
@@ -187,8 +226,11 @@ public class PythonProjectTestUnitSetting extends AnAction {
      * @return 元素名
      */
     private String getElementName(String fileName) {
-        String[] split = fileName.split(TEST_FUNCTION_PREFIX);
-        return split[split.length-1];
+        Matcher matcher = TEST_FILE_PREFIX.matcher(fileName);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
     }
 
 
@@ -258,7 +300,7 @@ public class PythonProjectTestUnitSetting extends AnAction {
                         // 获取元素所在文件
                         PsiFile psiFile = PsiTreeUtil.getParentOfType(cls, PsiFile.class);
                         // 切换文件
-                        Editor editor = toggleSourceFile(e.getProject(), psiFile);
+                        Editor editor = toggleCurrentEditor(e.getProject(), psiFile);
                         // 定位元素
                         editor.getCaretModel().moveToOffset(cls.getTextOffset());
                     }
@@ -274,7 +316,7 @@ public class PythonProjectTestUnitSetting extends AnAction {
                         // 获取元素所在文件
                         PsiFile psiFile = PsiTreeUtil.getParentOfType(cls, PsiFile.class);
                         // 切换文件
-                        Editor editor = toggleSourceFile(e.getProject(), psiFile);
+                        Editor editor = toggleCurrentEditor(e.getProject(), psiFile);
                         // 定位元素
                         editor.getCaretModel().moveToOffset(cls.getTextOffset());
                     }
@@ -289,4 +331,5 @@ public class PythonProjectTestUnitSetting extends AnAction {
 
         listPopup.showInBestPositionFor(e.getDataContext());
     }
+
 }

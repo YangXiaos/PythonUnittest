@@ -39,8 +39,8 @@ public class InitBasePathDialog extends JDialog {
         properties = PropertiesComponent.getInstance(project);
         String baseSourcePath = properties.getValue("PycharmTestUnit.BaseSourcePath");
         String testUnitPath = properties.getValue("PycharmTestUnit.TestUnitPath");
-        BaseProjectPath.setText(baseSourcePath);
-        TestUnitPath.setText(testUnitPath);
+        BaseProjectPath.setText(baseSourcePath != null ? baseSourcePath : project.getBasePath());
+        TestUnitPath.setText(testUnitPath != null ? testUnitPath : project.getBasePath());
 
         // call onCancel() when cross is clicked
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
