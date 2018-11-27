@@ -36,6 +36,7 @@
     <action id="PythonProjectUnitTest" class="PythonProjectTestUnitSetting" text="PycharmUnitTest"
             description="python unittest">
       <add-to-group group-id="WindowMenu" anchor="first"/>
+      <keyboard-shortcut keymap="$default" first-keystroke="shift ctrl P"/>
     </action>
   </actions>
 

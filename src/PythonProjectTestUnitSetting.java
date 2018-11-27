@@ -14,11 +14,10 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.jetbrains.python.psi.PyClass;
-import com.jetbrains.python.psi.PyFile;
-import com.jetbrains.python.psi.PyFunction;
+import com.jetbrains.python.psi.*;
 import com.jetbrains.python.psi.impl.PyFunctionBuilder;
 import org.apache.log4j.Logger;
+import org.codehaus.groovy.runtime.ArrayUtil;
 
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -87,6 +86,8 @@ public class PythonProjectTestUnitSetting extends AnAction {
         if (filePath.startsWith(testUnitPath) && fileName.startsWith(TEST_FUNCTION_PREFIX)) {
 
             String elementName = getElementName(fileName);
+            if (pyFunction != null)
+            elementName = pyFunction.getName().split(TEST_FUNCTION_PREFIX)[1];
             VirtualFile directory = getDirectory(sourceDirParentPath);
             if (directory == null) {
                 // 提示没有 code
@@ -95,12 +96,11 @@ public class PythonProjectTestUnitSetting extends AnAction {
 
             PsiDirectory dir = PsiManager.getInstance(project).findDirectory(directory);
             List<PsiElement> elementList = new LinkedList<>();
-            elementList.addAll(getClassChildrenOfName(dir, elementName));
-            elementList.addAll(getFunctionChildrenOfName(dir, elementName));
+            elementList.addAll(getClassChildrenOfNameFromDir(dir, elementName));
+            elementList.addAll(getFunctionChildrenOfNameFromDir(dir, elementName));
             showSourceGroup(e, elementList);
             return;
         }
-
 
         // 源文件切回 测试文件， 创建测试文件
         if (filePath.startsWith(baseSourcePath)) {
@@ -121,24 +121,29 @@ public class PythonProjectTestUnitSetting extends AnAction {
             // 如果获取不到测试文件，则创建切换
             if (file == null) {
                 // 创建测试文件
-                String testRelativeDirFilePath = (testUnitPath + relativeDirFilePath).replace(project.getBasePath(), "");
-                PsiDirectory relativeDir = PyPackageUnit.createPyPackageOfPath(getRelativeDirPath(testRelativeDirFilePath), baseDir);
-
-                PsiFile testPsiFile = relativeDir.findFile(testFileName);
-                PyFile testFile;
-                if (testPsiFile == null) {
-                    testFile = (PyFile) relativeDir.createFile(testFileName);
-                } else {
-                    testFile = (PyFile) testPsiFile;
-                }
-                // 创建测试函数
-                PyFunction testFunction = new PyFunctionBuilder(testFunctionName, testFile).buildFunction();
+                String finalTestUnitPath = testUnitPath;
+                String finalTestFileName = testFileName;
+                String finalTestFunctionName = testFunctionName;
                 Runnable runnable = () -> {
+                    String testRelativeDirFilePath = (finalTestUnitPath + relativeDirFilePath).replace(project.getBasePath(), "");
+                    PsiDirectory relativeDir = PyPackageUnit.createPyPackageOfPath(getRelativeDirPath(testRelativeDirFilePath), baseDir);
+
+                    PsiFile testPsiFile = relativeDir.findFile(finalTestFileName);
+                    PyFile testFile;
+                    if (testPsiFile == null) {
+                        testFile = (PyFile) relativeDir.createFile(finalTestFileName);
+                    } else {
+                        testFile = (PyFile) testPsiFile;
+                    }
+                    // 创建测试函数
+                    PyFunction testFunction = new PyFunctionBuilder(finalTestFunctionName, testFile).buildFunction();
                     //写入
                     testFile.add(testFunction);
+                    toggleCurrentEditor(project, testFile).getCaretModel().moveToOffset(testFunction.getTextOffset());
+
                 };
+
                 WriteCommandAction.runWriteCommandAction(project, runnable);
-                toggleCurrentEditor(project, testFile).getCaretModel().moveToOffset(testFunction.getTextOffset());
                 return;
             }
             PsiFile testFile = PsiManager.getInstance(project).findFile(file);
@@ -236,18 +241,72 @@ public class PythonProjectTestUnitSetting extends AnAction {
 
     /**
      * 从父级元素，获取特定类名的元素
-     * @param parentElement 父级元素
+     * @param dir 父级元素
      * @param name 类名
      * @return psiElement 列表
      */
-    private List<PsiElement> getClassChildrenOfName(PsiElement parentElement, String name) {
-        PyClass[] children = PsiTreeUtil.getChildrenOfType(parentElement, PyClass.class);
+    private List<PsiElement> getClassChildrenOfNameFromDir(PsiDirectory dir, String name) {
 
         List<PsiElement> result = new LinkedList<>();
+        for (PsiFile psiFile : dir.getFiles()) {
+            result.addAll(getClassChildrenOfName(psiFile, name));
+        }
+        return result;
+    }
+
+
+    /**
+     * 从父级元素，获取特定类名的元素
+     * @param dir 父级元素
+     * @param name 类名
+     * @return psiElement 列表
+     */
+    private List<PsiElement> getFunctionChildrenOfNameFromDir(PsiDirectory dir, String name) {
+
+        List<PsiElement> result = new LinkedList<>();
+        for (PsiFile psiFile : dir.getFiles()) {
+            result.addAll(getFunctionChildrenOfName(psiFile, name));
+
+            PyClass[] classes = PsiTreeUtil.getChildrenOfType(psiFile, PyClass.class);
+            if (classes == null) {
+                continue;
+            }
+            for (PyClass cls : classes) {
+                PyFunction[] methods = cls.getMethods();
+
+                for (PyFunction method : methods) {
+                    if (method.getName().equals(name)) {
+                        result.add(method);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+
+    private List<PsiElement> getFunctionChildrenOfName(PsiElement psiElement, String name) {
+        List<PsiElement> result = new LinkedList<>();
+        PyFunction[] children = PsiTreeUtil.getChildrenOfType(psiElement, PyFunction.class);
+
         if (children == null) {
             return result;
         }
+        for (PyFunction child : children) {
+            if (Objects.equals(child.getName(), name)) {
+                result.add(child);
+            }
+        }
+        return result;
+    }
 
+
+    private List<PsiElement> getClassChildrenOfName(PsiElement psiElement, String name) {
+        List<PsiElement> result = new LinkedList<>();
+        PyClass[] children = PsiTreeUtil.getChildrenOfType(psiElement, PyClass.class);
+        if (children == null) {
+            return result;
+        }
         for (PyClass child : children) {
             if (Objects.equals(child.getName(), name)) {
                 result.add(child);
@@ -257,27 +316,6 @@ public class PythonProjectTestUnitSetting extends AnAction {
     }
 
 
-    /**
-     * 从父级元素，获取特定类名的元素
-     * @param parentElement 父级元素
-     * @param name 类名
-     * @return psiElement 列表
-     */
-    private List<PsiElement> getFunctionChildrenOfName(PsiElement parentElement, String name) {
-        PyFunction[] children = PsiTreeUtil.getChildrenOfType(parentElement, PyFunction.class);
-
-        List<PsiElement> result = new LinkedList<>();
-        if (children == null) {
-            return result;
-        }
-
-        for (PyFunction child : children) {
-            if (Objects.equals(child.getName(), name)) {
-                result.add(child);
-            }
-        }
-        return result;
-    }
 
 
     /**
@@ -294,7 +332,9 @@ public class PythonProjectTestUnitSetting extends AnAction {
             // pyclass
             if (psiElement instanceof PyClass) {
                 PyClass cls = (PyClass) psiElement;
-                actionGroup.add(new AnAction(cls.getName()) {
+                actionGroup.add(new AnAction(cls.getName() +
+                        String.format(" (%s)",
+                                cls.getContainingFile().getVirtualFile().getPath())) {
                     @Override
                     public void actionPerformed(AnActionEvent e) {
                         // 获取元素所在文件
@@ -310,7 +350,9 @@ public class PythonProjectTestUnitSetting extends AnAction {
             // pyfunction
             if (psiElement instanceof PyFunction) {
                 PyFunction cls = (PyFunction) psiElement;
-                actionGroup.add(new AnAction(cls.getName()) {
+                actionGroup.add(new AnAction(cls.getName() +
+                        String.format(" (%s)",
+                                cls.getContainingFile().getVirtualFile().getPath())) {
                     @Override
                     public void actionPerformed(AnActionEvent e) {
                         // 获取元素所在文件
