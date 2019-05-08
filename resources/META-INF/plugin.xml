@@ -38,6 +38,9 @@
       <add-to-group group-id="WindowMenu" anchor="first"/>
       <keyboard-shortcut keymap="$default" first-keystroke="shift ctrl P"/>
     </action>
+      <action id="InitPath" class="InitPathAction" text="InitPath" description="init path">
+          <add-to-group group-id="WindowMenu" anchor="last"/>
+      </action>
   </actions>
 
 </idea-plugin>
